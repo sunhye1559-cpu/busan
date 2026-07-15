@@ -471,4 +471,52 @@ async function send() {
 .suggestions {
   flex-shrink: 0;
 }
+
+.launcher {
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+  transform-origin: center;
+}
+
+.launcher img {
+  transition: transform 0.25s ease;
+  transform-origin: center;
+}
+
+.launcher:hover {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 22px 52px rgba(16, 37, 63, 0.32);
+}
+
+.launcher:hover img {
+  animation: chatbotWiggle 0.65s ease-in-out;
+}
+
+.launcher:active {
+  transform: translateY(-1px) scale(0.97);
+}
+
+@keyframes chatbotWiggle {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+
+  25% {
+    transform: translateY(-3px) rotate(-6deg) scale(1.05);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(0deg) scale(1.08);
+  }
+
+  75% {
+    transform: translateY(-3px) rotate(6deg) scale(1.05);
+  }
+
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
 </style>
