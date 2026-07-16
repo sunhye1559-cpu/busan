@@ -167,6 +167,49 @@ const changeRecommendation = () => {
     (recommendationIndex.value + 1) % attractionPool.value.length
 }
 
+const translateCategory = (category) => {
+  if (props.language === 'KO') return category
+
+  const categoryMap = {
+    자유게시판: 'Free Board',
+    여행질문: 'Travel Questions',
+    맛집후기: 'Restaurant Reviews',
+    축제정보: 'Festival Information',
+  }
+
+  return categoryMap[category] || category
+}
+
+const translatePlace = (place) => {
+  if (props.language === 'KO') return place
+
+  const placeMap = {
+    'KT&G 상상마당 부산': 'KT&G Sangsangmadang Busan',
+    광안리해수욕장: 'Gwangalli Beach',
+    해운대해수욕장: 'Haeundae Beach',
+    감천문화마을: 'Gamcheon Culture Village',
+    태종대: 'Taejongdae',
+    자갈치시장: 'Jagalchi Market',
+    송도해수욕장: 'Songdo Beach',
+    흰여울문화마을: 'Huinnyeoul Culture Village',
+    용두산공원: 'Yongdusan Park',
+    부산타워: 'Busan Tower',
+    국제시장: 'Gukje Market',
+  }
+
+  return placeMap[place] || place
+}
+
+const translateAddress = (address) => {
+  if (props.language === 'KO') return address
+
+  const addressMap = {
+    '부산광역시 부산진구 서면로 39':
+      '39 Seomyeon-ro, Busanjin-gu, Busan',
+  }
+
+  return addressMap[address] || address
+}
 
 const weatherText = computed(() => {
   const code = weather.value?.weatherCode
@@ -470,8 +513,11 @@ onBeforeUnmount(() => {
 
               <strong>
                 {{
-                  latestPost?.category ||
-                  (props.language === 'KO' ? '커뮤니티' : 'Community')
+                  latestPost?.category
+                    ? translateCategory(latestPost.category)
+                    : props.language === 'KO'
+                      ? '커뮤니티'
+                      : 'Community'
                 }}
               </strong>
 
@@ -502,18 +548,23 @@ onBeforeUnmount(() => {
 
               <strong>
                 {{
-                  recommendedPlace?.title ||
-                  (props.language === 'KO' ? '부산 여행지' : 'Busan Spot')
+                  recommendedPlace?.title
+                    ? translatePlace(recommendedPlace.title)
+                    : props.language === 'KO'
+                      ? '부산 여행지'
+                      : 'Busan Spot'
                 }}
               </strong>
 
               <p>
                 {{
-                  recommendedPlace?.address ||
-                  recommendedPlace?.place ||
-                  (props.language === 'KO'
-                    ? '지도를 열어 주변 명소를 확인하세요.'
-                    : 'Open the map to find nearby attractions.')
+                  recommendedPlace?.address
+                    ? translateAddress(recommendedPlace.address)
+                    : recommendedPlace?.place
+                      ? translatePlace(recommendedPlace.place)
+                      : props.language === 'KO'
+                        ? '지도를 열어 주변 명소를 확인하세요.'
+                        : 'Open the map to find nearby attractions.'
                 }}
               </p>
             </div>

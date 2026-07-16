@@ -11,16 +11,104 @@ const props = defineProps({
 
 const { tourData } = useLocalHub()
 
+const today = new Date()
 const year = ref(2026)
 const month = ref(7)
 const selected = ref(null)
+const selectedDateKey = ref('')
 const imageFailed = ref(false)
 
 const festivals = computed(() =>
-  [...tourData['축제/공연/행사']].sort((a, b) =>
-    (b.modified || '').localeCompare(a.modified || ''),
+  [...(tourData['축제/공연/행사'] || [])].sort((a, b) =>
+    (a.start || '').localeCompare(b.start || ''),
   ),
 )
+
+const monthKey = computed(
+  () => `${year.value}${String(month.value + 1).padStart(2, '0')}`,
+)
+
+const monthEvents = computed(() =>
+  festivals.value.filter((event) => {
+    const start = event.start || ''
+    const end = event.end || start
+
+    return start.slice(0, 6) <= monthKey.value &&
+      end.slice(0, 6) >= monthKey.value
+  }),
+)
+
+const dayNames = computed(() =>
+  props.language === 'KO'
+    ? ['일', '월', '화', '수', '목', '금', '토']
+    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+)
+
+const monthTitle = computed(() =>
+  props.language === 'KO'
+    ? `${year.value}년 ${month.value + 1}월`
+    : new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date(year.value, month.value, 1)),
+)
+
+const formatDate = (value) =>
+  value?.length === 8
+    ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}`
+    : props.language === 'KO'
+      ? '미정'
+      : 'TBD'
+
+const formatShortDate = (value) =>
+  value?.length === 8
+    ? props.language === 'KO'
+      ? `${Number(value.slice(4, 6))}월 ${Number(value.slice(6, 8))}일`
+      : new Intl.DateTimeFormat('en-US', {
+          month: 'short',
+          day: 'numeric',
+        }).format(
+          new Date(
+            Number(value.slice(0, 4)),
+            Number(value.slice(4, 6)) - 1,
+            Number(value.slice(6, 8)),
+          ),
+        )
+    : props.language === 'KO'
+      ? '날짜 미정'
+      : 'Date TBD'
+
+const eventOccursOn = (event, key) => {
+  const start = event.start || ''
+  const end = event.end || start
+
+  // 행사 기간 밖이면 표시하지 않음
+  if (!(start <= key && key <= end)) {
+    return false
+  }
+
+  // YYYYMMDD를 날짜 객체로 변환
+  const eventDate = new Date(
+    Number(key.slice(0, 4)),
+    Number(key.slice(4, 6)) - 1,
+    Number(key.slice(6, 8)),
+  )
+
+  const day = eventDate.getDay()
+  // 일요일: 0, 토요일: 6
+  const isWeekend = day === 6
+
+  // 광안리 드론쇼는 토·일요일에만 표시
+  if (
+    event.title?.includes('광안리') &&
+    event.title?.includes('드론')
+  ) {
+    return isWeekend
+  }
+
+  // 다른 행사는 기존처럼 기간 전체에 표시
+  return true
+}
 
 const cells = computed(() => {
   const first = new Date(year.value, month.value, 1)
@@ -32,7 +120,9 @@ const cells = computed(() => {
     result.push({
       day: previousLast - i,
       current: false,
+      key: '',
       events: [],
+      isToday: false,
     })
   }
 
@@ -45,7 +135,14 @@ const cells = computed(() => {
     result.push({
       day,
       current: true,
-      events: festivals.value.filter((event) => event.start === key),
+      key,
+      events: monthEvents.value.filter((event) =>
+        eventOccursOn(event, key),
+      ),
+      isToday:
+        today.getFullYear() === year.value &&
+        today.getMonth() === month.value &&
+        today.getDate() === day,
     })
   }
 
@@ -55,7 +152,9 @@ const cells = computed(() => {
     result.push({
       day: next,
       current: false,
+      key: '',
       events: [],
+      isToday: false,
     })
 
     next += 1
@@ -64,11 +163,35 @@ const cells = computed(() => {
   return result
 })
 
-const dayNames = computed(() =>
-  props.language === 'KO'
-    ? ['일', '월', '화', '수', '목', '금', '토']
-    : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-)
+const selectedDayEvents = computed(() => {
+  if (!selectedDateKey.value) return []
+
+  return monthEvents.value.filter((event) =>
+    eventOccursOn(event, selectedDateKey.value),
+  )
+})
+
+const monthStats = computed(() => {
+  const venues = new Set(
+    monthEvents.value
+      .map((event) => event.place || event.address)
+      .filter(Boolean),
+  )
+
+  const activeDays = new Set()
+
+  monthEvents.value.forEach((event) => {
+    if (event.start?.startsWith(monthKey.value)) {
+      activeDays.add(event.start)
+    }
+  })
+
+  return {
+    events: monthEvents.value.length,
+    venues: venues.size,
+    days: activeDays.size,
+  }
+})
 
 function move(amount) {
   month.value += amount
@@ -82,6 +205,22 @@ function move(amount) {
     month.value = 0
     year.value += 1
   }
+
+  selectedDateKey.value = ''
+}
+
+function goToday() {
+  year.value = today.getFullYear()
+  month.value = today.getMonth()
+  selectedDateKey.value =
+    `${today.getFullYear()}` +
+    `${String(today.getMonth() + 1).padStart(2, '0')}` +
+    `${String(today.getDate()).padStart(2, '0')}`
+}
+
+function selectDay(cell) {
+  if (!cell.current) return
+  selectedDateKey.value = cell.key
 }
 
 function openEvent(event) {
@@ -97,13 +236,6 @@ function closeModal() {
 function handleImageError() {
   imageFailed.value = true
 }
-
-const formatDate = (value) =>
-  value?.length === 8
-    ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}`
-    : props.language === 'KO'
-      ? '미정'
-      : 'TBD'
 
 const getEventImage = (event) =>
   event?.image ||
@@ -144,153 +276,242 @@ const getHomepage = (event) =>
 <template>
   <section class="page">
     <div class="container">
-      <div class="page-head">
+      <div class="page-head calendar-page-head">
         <div>
           <div class="eyebrow">FESTIVAL CALENDAR</div>
 
           <h1>
             {{
               props.language === 'KO'
-                ? '축제 캘린더'
-                : 'Festival Calendar'
+                ? '월별 축제 캘린더'
+                : 'Monthly Festival Calendar'
             }}
           </h1>
 
           <p>
             {{
               props.language === 'KO'
-                ? '행사 날짜, 장소, 갱신일 정보를 확인합니다.'
-                : 'Check event dates, locations, and update information.'
+                ? '달력에서 원하는 날짜를 누르면 그날의 행사를 바로 확인할 수 있습니다.'
+                : 'Select a date to view events happening that day.'
             }}
           </p>
         </div>
+
+        <button class="today-btn" type="button" @click="goToday">
+          {{ props.language === 'KO' ? '오늘로 이동' : 'Go to Today' }}
+        </button>
       </div>
 
-      <div class="panel calendar-shell">
-        <div class="calendar-top">
-          <button
-            class="btn ghost small"
-            type="button"
-            @click="move(-1)"
-          >
-            ‹ {{ props.language === 'KO' ? '이전' : 'Previous' }}
-          </button>
-
-          <h3>
+      <div class="calendar-summary">
+        <article class="summary-card summary-main">
+          <span>
+            {{ props.language === 'KO' ? '현재 보고 있는 달' : 'Viewing Month' }}
+          </span>
+          <strong>{{ monthTitle }}</strong>
+          <p>
             {{
               props.language === 'KO'
-                ? `${year}년 ${month + 1}월`
-                : `${month + 1}/${year}`
+                ? `${monthStats.events}개의 축제·행사가 등록되어 있습니다.`
+                : `${monthStats.events} festivals and events are listed.`
             }}
-          </h3>
+          </p>
+        </article>
 
-          <button
-            class="btn ghost small"
-            type="button"
-            @click="move(1)"
-          >
-            {{ props.language === 'KO' ? '다음' : 'Next' }} ›
-          </button>
-        </div>
+        <article class="summary-card">
+          <span>{{ props.language === 'KO' ? '행사 수' : 'Events' }}</span>
+          <strong>{{ monthStats.events }}</strong>
+        </article>
 
-        <div class="wave-bg" aria-hidden="true">
-          <svg
-            class="wave wave1"
-            viewBox="0 0 1200 200"
-            preserveAspectRatio="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <linearGradient id="g1" x1="0" x2="1">
-                <stop offset="0" stop-color="#a7e9ff" />
-                <stop offset="1" stop-color="#3bb0ff" />
-              </linearGradient>
-            </defs>
+        <article class="summary-card">
+          <span>{{ props.language === 'KO' ? '행사 장소' : 'Venues' }}</span>
+          <strong>{{ monthStats.venues }}</strong>
+        </article>
 
-            <path
-              d="M0,100 C150,200 350,0 600,100 C850,200 1050,0 1200,100 L1200,200 L0,200 Z"
-              fill="url(#g1)"
-            />
-          </svg>
+        <article class="summary-card">
+          <span>{{ props.language === 'KO' ? '시작 날짜' : 'Start Dates' }}</span>
+          <strong>{{ monthStats.days }}</strong>
+        </article>
+      </div>
 
-          <svg
-            class="wave wave2"
-            viewBox="0 0 1200 200"
-            preserveAspectRatio="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M0,120 C200,20 400,220 600,120 C800,20 1000,220 1200,120 L1200,200 L0,200 Z"
-              fill="rgba(59,176,255,0.12)"
-            />
-          </svg>
-        </div>
+      <div class="calendar-layout">
+        <section class="calendar-panel">
+          <div class="calendar-toolbar">
+            <button
+              class="month-button"
+              type="button"
+              @click="move(-1)"
+            >
+              ‹
+              <span>
+                {{ props.language === 'KO' ? '이전 달' : 'Previous' }}
+              </span>
+            </button>
 
-        <div class="calendar-grid">
-          <div
-            v-for="day in dayNames"
-            :key="day"
-            class="day-name"
-          >
-            {{ day }}
+            <div class="month-title">
+              <small>
+                {{ props.language === 'KO' ? 'BUSAN EVENTS' : 'BUSAN EVENTS' }}
+              </small>
+              <h2>{{ monthTitle }}</h2>
+            </div>
+
+            <button
+              class="month-button"
+              type="button"
+              @click="move(1)"
+            >
+              <span>
+                {{ props.language === 'KO' ? '다음 달' : 'Next' }}
+              </span>
+              ›
+            </button>
+          </div>
+
+          <div class="calendar-grid">
+            <div
+              v-for="day in dayNames"
+              :key="day"
+              class="day-name"
+            >
+              {{ day }}
+            </div>
+
+            <button
+              v-for="(cell, index) in cells"
+              :key="`${cell.day}-${index}`"
+              class="calendar-cell"
+              :class="{
+                muted: !cell.current,
+                today: cell.isToday,
+                selected: selectedDateKey === cell.key,
+                'has-events': cell.events.length,
+              }"
+              type="button"
+              :disabled="!cell.current"
+              @click="selectDay(cell)"
+            >
+              <span class="day-number">{{ cell.day }}</span>
+
+              <div
+                v-if="cell.events.length"
+                class="event-preview"
+              >
+                <span class="event-count">
+                  {{
+                    props.language === 'KO'
+                      ? `${cell.events.length}개`
+                      : `${cell.events.length}`
+                  }}
+                </span>
+
+                <strong>{{ cell.events[0].title }}</strong>
+
+                <small v-if="cell.events.length > 1">
+                  {{
+                    props.language === 'KO'
+                      ? `외 ${cell.events.length - 1}개`
+                      : `+${cell.events.length - 1} more`
+                  }}
+                </small>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <aside class="day-panel">
+          <div class="day-panel-head">
+            <div>
+              <span>
+                {{
+                  selectedDateKey
+                    ? formatShortDate(selectedDateKey)
+                    : props.language === 'KO'
+                      ? '날짜를 선택하세요'
+                      : 'Select a Date'
+                }}
+              </span>
+
+              <h3>
+                {{
+                  selectedDateKey
+                    ? props.language === 'KO'
+                      ? '이날의 행사'
+                      : 'Events This Day'
+                    : props.language === 'KO'
+                      ? '월간 행사 미리보기'
+                      : 'Monthly Event Preview'
+                }}
+              </h3>
+            </div>
+
+            <strong>
+              {{
+                selectedDateKey
+                  ? selectedDayEvents.length
+                  : monthEvents.length
+              }}
+            </strong>
           </div>
 
           <div
-            v-for="(cell, cellIndex) in cells"
-            :key="`${cell.day}-${cellIndex}`"
-            class="cell"
-            :class="{ muted: !cell.current }"
+            v-if="
+              (selectedDateKey && selectedDayEvents.length) ||
+              (!selectedDateKey && monthEvents.length)
+            "
+            class="event-card-list"
           >
-            <b>{{ cell.day }}</b>
-
             <button
-              v-for="event in cell.events.slice(0, 3)"
+              v-for="event in (
+                selectedDateKey
+                  ? selectedDayEvents
+                  : monthEvents.slice(0, 8)
+              )"
               :key="`${event.title}-${event.start}`"
-              class="event"
+              class="compact-event-card"
               type="button"
               @click="openEvent(event)"
             >
-              {{ event.title }}
+              <div class="compact-date">
+                <span>{{ formatShortDate(event.start) }}</span>
+                <small v-if="event.end && event.end !== event.start">
+                  ~ {{ formatShortDate(event.end) }}
+                </small>
+              </div>
+
+              <div class="compact-event-copy">
+                <strong>{{ event.title }}</strong>
+                <p>
+                  {{
+                    event.place ||
+                    event.address ||
+                    (props.language === 'KO'
+                      ? '장소 정보 없음'
+                      : 'No venue information')
+                  }}
+                </p>
+              </div>
+
+              <span class="compact-arrow">→</span>
             </button>
           </div>
-        </div>
-      </div>
 
-      <div class="panel festival-list">
-        <div
-          v-for="event in festivals.slice(0, 30)"
-          :key="`${event.title}-${event.start}-${event.address}`"
-          class="festival-row"
-          role="button"
-          tabindex="0"
-          @click="openEvent(event)"
-          @keydown.enter="openEvent(event)"
-        >
-          <span class="badge">
-            {{ formatDate(event.start) }}
-          </span>
-
-          <div>
-            <strong>{{ event.title }}</strong>
-            <div class="meta">
-              {{ event.address }}
-            </div>
+          <div v-else class="empty-day">
+            <span>🗓️</span>
+            <strong>
+              {{
+                props.language === 'KO'
+                  ? '등록된 행사가 없습니다.'
+                  : 'No events are listed.'
+              }}
+            </strong>
+            <p>
+              {{
+                props.language === 'KO'
+                  ? '다른 날짜나 달을 선택해보세요.'
+                  : 'Try another date or month.'
+              }}
+            </p>
           </div>
-
-          <div class="meta">
-            {{
-              event.place ||
-              (props.language === 'KO'
-                ? '장소 정보 없음'
-                : 'No venue information')
-            }}
-          </div>
-
-          <div class="meta">
-            {{ props.language === 'KO' ? '갱신' : 'Updated' }}
-            {{ formatDate(event.modified?.slice(0, 8)) }}
-          </div>
-        </div>
+        </aside>
       </div>
     </div>
   </section>
@@ -321,12 +542,8 @@ const getHomepage = (event) =>
           @error="handleImageError"
         />
 
-        <div
-          v-else
-          class="modal-image-empty"
-        >
+        <div v-else class="modal-image-empty">
           <span>🎪</span>
-
           <p>
             {{
               props.language === 'KO'
@@ -353,12 +570,8 @@ const getHomepage = (event) =>
         <div class="detail-list">
           <div class="detail-item">
             <span class="detail-icon">📍</span>
-
             <div>
-              <strong>
-                {{ props.language === 'KO' ? '장소' : 'Venue' }}
-              </strong>
-
+              <strong>{{ props.language === 'KO' ? '장소' : 'Venue' }}</strong>
               <p>
                 {{
                   selected.place ||
@@ -373,12 +586,8 @@ const getHomepage = (event) =>
 
           <div class="detail-item">
             <span class="detail-icon">🕐</span>
-
             <div>
-              <strong>
-                {{ props.language === 'KO' ? '시간' : 'Time' }}
-              </strong>
-
+              <strong>{{ props.language === 'KO' ? '시간' : 'Time' }}</strong>
               <p>
                 {{
                   selected.playtime ||
@@ -392,12 +601,8 @@ const getHomepage = (event) =>
 
           <div class="detail-item">
             <span class="detail-icon">🗺️</span>
-
             <div>
-              <strong>
-                {{ props.language === 'KO' ? '주소' : 'Address' }}
-              </strong>
-
+              <strong>{{ props.language === 'KO' ? '주소' : 'Address' }}</strong>
               <p>
                 {{
                   selected.address ||
@@ -425,11 +630,7 @@ const getHomepage = (event) =>
             }}
           </a>
 
-          <button
-            class="btn ghost"
-            type="button"
-            @click="closeModal"
-          >
+          <button class="btn ghost" type="button" @click="closeModal">
             {{ props.language === 'KO' ? '닫기' : 'Close' }}
           </button>
         </div>
@@ -439,328 +640,383 @@ const getHomepage = (event) =>
 </template>
 
 <style scoped>
-.calendar-shell {
-  position: relative;
-  overflow: visible;
-  padding: 24px;
-  background: linear-gradient(180deg, #eef9ff, #fbfdff);
-  border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(20, 30, 60, 0.06);
+.calendar-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
 }
 
-.calendar-top {
-  position: relative;
-  z-index: 1;
-  display: flex;
+.calendar-page-head p {
+  color: rgba(6, 18, 39, 0.76);
+}
+
+.today-btn {
+  flex-shrink: 0;
+  padding: 11px 17px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #052738;
+  font-weight: 800;
+  border: 1px solid rgba(6, 18, 39, 0.08);
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(16, 37, 63, 0.06);
+  cursor: pointer;
+}
+
+.calendar-summary {
+  display: grid;
+  grid-template-columns: 1.7fr repeat(3, 0.7fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-card {
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(16, 37, 63, 0.06);
+  backdrop-filter: blur(8px);
+}
+
+.summary-card span {
+  display: block;
+  color: rgba(6, 18, 39, 0.56);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 6px;
+  color: #052738;
+  font-size: 27px;
+}
+
+.summary-card p {
+  margin: 7px 0 0;
+  color: rgba(6, 18, 39, 0.65);
+  font-size: 13px;
+}
+
+.summary-main {
+  background:
+    radial-gradient(
+      circle at 90% 10%,
+      rgba(0, 169, 206, 0.17),
+      transparent 32%
+    ),
+    linear-gradient(135deg, #fff4f9, #eefbff);
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.65fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.calendar-panel,
+.day-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(16, 37, 63, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.calendar-panel {
+  padding: 22px;
+}
+
+.calendar-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 18px;
 }
 
-.calendar-top h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+.month-button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  width: fit-content;
+  padding: 9px 13px;
+  background: #ffffff;
+  color: #052738;
+  font-weight: 800;
+  border: 1px solid rgba(6, 18, 39, 0.08);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.month-button:last-child {
+  justify-self: end;
+}
+
+.month-title {
+  text-align: center;
+}
+
+.month-title small {
+  color: #d4146a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+}
+
+.month-title h2 {
+  margin: 3px 0 0;
+  color: #052738;
+  font-size: 22px;
 }
 
 .calendar-grid {
-  position: relative;
-  z-index: 1;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  background: transparent;
-}
-
-.wave-bg {
-  position: absolute;
-  right: 0;
-  bottom: -10px;
-  left: 0;
-  z-index: 0;
-  height: 160px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.wave {
-  position: absolute;
-  left: 50%;
-  width: 220%;
-  height: 160px;
-  transform: translateX(-50%);
-}
-
-.wave1 {
-  opacity: 0.95;
-  animation: wave1 14s ease-in-out infinite;
-}
-
-.wave2 {
-  bottom: 8px;
-  opacity: 0.6;
-  animation: wave2 20s linear infinite reverse;
-}
-
-@keyframes wave1 {
-  0% {
-    transform: translateX(-50%) translateY(0);
-  }
-
-  50% {
-    transform: translateX(-48%) translateY(8px);
-  }
-
-  100% {
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-@keyframes wave2 {
-  0% {
-    transform: translateX(-50%) translateY(0);
-  }
-
-  50% {
-    transform: translateX(-52%) translateY(6px);
-  }
-
-  100% {
-    transform: translateX(-50%) translateY(0);
-  }
+  gap: 7px;
 }
 
 .day-name {
-  padding: 10px 6px;
+  padding: 8px 4px;
   text-align: center;
-  background: linear-gradient(90deg, #fbfbff, #f5f8ff);
-  color: rgba(6, 18, 39, 0.65);
-  font-weight: 700;
-  border-radius: 10px;
-  font-size: 13px;
+  color: rgba(6, 18, 39, 0.56);
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.cell {
+.calendar-cell {
   position: relative;
-  min-height: 120px;
+  min-height: 106px;
   overflow: hidden;
   padding: 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.96),
-    rgba(250, 250, 250, 0.94)
-  );
-  border: 1px solid rgba(6, 18, 39, 0.04);
-  border-radius: 10px;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.cell.muted {
-  background: rgba(245, 247, 250, 0.92);
-  color: var(--muted);
-}
-
-.cell b {
-  display: inline-block;
-  padding: 4px 6px;
-  color: rgba(3, 60, 90, 0.9);
-  font-weight: 700;
-  border-radius: 8px;
-}
-
-.cell:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 30px rgba(20, 30, 60, 0.06);
-}
-
-.event {
-  position: relative;
-  display: -webkit-box;
-  width: 100%;
-  margin-top: 8px;
-  overflow: hidden;
-  padding: 10px 12px;
   text-align: left;
-  background: linear-gradient(135deg, #e8f7ff, #dff6ff);
-  color: #022033;
-  font-size: 13px;
-  font-weight: 700;
-  border: 1px solid rgba(3, 60, 90, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(3, 60, 90, 0.06);
+  background: rgba(248, 251, 253, 0.94);
+  color: #052738;
+  border: 1px solid rgba(6, 18, 39, 0.05);
+  border-radius: 13px;
   cursor: pointer;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   transition:
-    transform 0.36s cubic-bezier(0.22, 0.9, 0.35, 1),
-    box-shadow 0.36s cubic-bezier(0.22, 0.9, 0.35, 1);
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.event::before {
-  position: absolute;
-  inset: 0;
-  content: '';
-  background-image: url('https://www.transparenttextures.com/patterns/asfalt-light.png');
-  opacity: 0.08;
-  border-radius: 12px;
-  pointer-events: none;
-  mix-blend-mode: overlay;
-}
-
-.event:hover {
+.calendar-cell:hover:not(:disabled) {
+  z-index: 2;
+  border-color: rgba(0, 169, 206, 0.24);
+  box-shadow: 0 10px 22px rgba(16, 37, 63, 0.08);
   transform: translateY(-3px);
-  box-shadow: 0 14px 34px rgba(20, 40, 80, 0.1);
 }
 
-.festival-list {
-  position: relative;
-  z-index: 1;
-  margin-top: 18px;
+.calendar-cell.muted {
+  opacity: 0.3;
+  cursor: default;
 }
 
-.festival-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 120px 1fr 160px 140px;
-  gap: 12px;
-  align-items: center;
-  overflow: hidden;
-  padding: 14px;
-  cursor: pointer;
+.calendar-cell.today {
+  box-shadow: inset 0 0 0 2px rgba(212, 20, 106, 0.45);
+}
+
+.calendar-cell.selected {
+  background: linear-gradient(150deg, #e7f8ff, #fff0f6);
+  border-color: rgba(0, 169, 206, 0.34);
+  box-shadow: 0 12px 26px rgba(16, 37, 63, 0.1);
+}
+
+.calendar-cell.has-events {
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(250, 250, 250, 0.96)
-  );
-  border: 1px solid rgba(6, 18, 39, 0.06);
-  border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(6, 18, 39, 0.05);
-  backdrop-filter: blur(6px);
-  transition:
-    transform 0.36s cubic-bezier(0.22, 0.9, 0.35, 1),
-    box-shadow 0.36s cubic-bezier(0.22, 0.9, 0.35, 1);
-}
-
-.festival-row::before {
-  position: absolute;
-  inset: 0;
-  content: '';
-  background-repeat: repeat;
-  background-size: 64px 64px;
-  opacity: 0.1;
-  border-radius: 12px;
-  pointer-events: none;
-}
-
-.festival-row:nth-child(5n + 1) {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 235, 242, 0.6),
-    rgba(255, 255, 255, 0.94)
+    150deg,
+    rgba(237, 251, 255, 0.98),
+    rgba(255, 248, 252, 0.98)
   );
 }
 
-.festival-row:nth-child(5n + 1)::before {
-  background-image: url('https://www.transparenttextures.com/patterns/asfalt-light.png');
+.day-number {
+  display: inline-grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  font-size: 13px;
+  font-weight: 900;
+  border-radius: 9px;
 }
 
-.festival-row:nth-child(5n + 2) {
-  background: linear-gradient(
-    180deg,
-    rgba(226, 249, 255, 0.6),
-    rgba(255, 255, 255, 0.94)
-  );
+.calendar-cell.today .day-number {
+  background: linear-gradient(135deg, #d4146a, #00a9ce);
+  color: #ffffff;
 }
 
-.festival-row:nth-child(5n + 2)::before {
-  background-image: url('https://www.transparenttextures.com/patterns/diagmonds.png');
+.event-preview {
+  margin-top: 7px;
 }
 
-.festival-row:nth-child(5n + 3) {
-  background: linear-gradient(
-    180deg,
-    rgba(240, 255, 236, 0.6),
-    rgba(255, 255, 255, 0.94)
-  );
+.event-count {
+  display: inline-block;
+  padding: 3px 7px;
+  background: rgba(0, 169, 206, 0.1);
+  color: #087a9e;
+  font-size: 10px;
+  font-weight: 900;
+  border-radius: 999px;
 }
 
-.festival-row:nth-child(5n + 3)::before {
-  background-image: url('https://www.transparenttextures.com/patterns/pw_maze_white.png');
-}
-
-.festival-row:nth-child(5n + 4) {
-  background: linear-gradient(
-    180deg,
-    rgba(244, 240, 255, 0.6),
-    rgba(255, 255, 255, 0.94)
-  );
-}
-
-.festival-row:nth-child(5n + 4)::before {
-  background-image: url('https://www.transparenttextures.com/patterns/vertical-linen.png');
-}
-
-.festival-row:nth-child(5n + 5) {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 250, 235, 0.6),
-    rgba(255, 255, 255, 0.94)
-  );
-}
-
-.festival-row:nth-child(5n + 5)::before {
-  background-image: url('https://www.transparenttextures.com/patterns/az_subtle.png');
-}
-
-.festival-row + .festival-row {
-  margin-top: 10px;
-}
-
-.festival-row:hover,
-.festival-row:focus {
-  outline: none;
-  transform: translateY(-4px);
-  box-shadow: 0 18px 36px rgba(20, 30, 60, 0.08);
-}
-
-.festival-row strong {
+.event-preview strong {
   display: -webkit-box;
-  margin-bottom: 6px;
+  margin-top: 7px;
   overflow: hidden;
-  color: #022033;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.25;
-  text-overflow: ellipsis;
+  color: #052738;
+  font-size: 12px;
+  line-height: 1.35;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
-.festival-row .meta {
-  min-width: 0;
+.event-preview small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(6, 18, 39, 0.48);
+  font-size: 10px;
+}
+
+.day-panel {
+  position: sticky;
+  top: 78px;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.badge {
-  display: inline-block;
-  padding: 6px 10px;
-  background: linear-gradient(90deg, #eef6ff, #f0fff7);
-  color: var(--muted);
-  font-weight: 700;
-  border-radius: 10px;
+.day-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  background:
+    radial-gradient(
+      circle at 100% 0,
+      rgba(0, 169, 206, 0.16),
+      transparent 38%
+    ),
+    linear-gradient(135deg, #fff7fb, #effaff);
+  border-bottom: 1px solid rgba(6, 18, 39, 0.06);
 }
 
-.meta {
-  color: var(--muted);
+.day-panel-head span {
+  color: #d4146a;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.day-panel-head h3 {
+  margin: 4px 0 0;
+  color: #052738;
+  font-size: 18px;
+}
+
+.day-panel-head > strong {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: #ffffff;
+  color: #087a9e;
+  font-size: 19px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(16, 37, 63, 0.07);
+}
+
+.event-card-list {
+  display: grid;
+  gap: 9px;
+  max-height: 650px;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.compact-event-card {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 13px;
+  text-align: left;
+  background: #ffffff;
+  color: inherit;
+  border: 1px solid rgba(6, 18, 39, 0.06);
+  border-radius: 14px;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.compact-event-card:hover {
+  box-shadow: 0 10px 22px rgba(16, 37, 63, 0.08);
+  transform: translateY(-2px);
+}
+
+.compact-date span,
+.compact-date small {
+  display: block;
+}
+
+.compact-date span {
+  color: #087a9e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.compact-date small {
+  margin-top: 3px;
+  color: rgba(6, 18, 39, 0.46);
+  font-size: 9px;
+}
+
+.compact-event-copy {
+  min-width: 0;
+}
+
+.compact-event-copy strong {
+  display: block;
+  overflow: hidden;
+  color: #052738;
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.page-head p {
-  color: rgba(6, 18, 39, 0.8);
-  font-size: 15px;
+.compact-event-copy p {
+  margin: 5px 0 0;
+  overflow: hidden;
+  color: rgba(6, 18, 39, 0.58);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-arrow {
+  color: rgba(6, 18, 39, 0.34);
+}
+
+.empty-day {
+  padding: 54px 24px;
+  text-align: center;
+}
+
+.empty-day span {
+  display: block;
+  font-size: 42px;
+}
+
+.empty-day strong {
+  display: block;
+  margin-top: 13px;
+  color: #052738;
+}
+
+.empty-day p {
+  margin: 7px 0 0;
+  color: rgba(6, 18, 39, 0.58);
+  font-size: 13px;
 }
 
 /* 상세 모달 */
@@ -810,27 +1066,21 @@ const getHomepage = (event) =>
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 100%;
   height: 320px;
   overflow: hidden;
-
   padding: 18px;
-  box-sizing: border-box;
-
   background: linear-gradient(135deg, #eef9ff, #fff4f8);
   border-radius: 22px 22px 0 0;
+  box-sizing: border-box;
 }
 
 .modal-image {
   display: block;
-
   width: 100%;
   height: 100%;
-
   object-fit: contain;
   object-position: center;
-
   background: #ffffff;
   border-radius: 12px;
 }
@@ -855,6 +1105,15 @@ const getHomepage = (event) =>
 
 .modal-content {
   padding: 30px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  background: linear-gradient(90deg, #eef6ff, #f0fff7);
+  color: rgba(6, 18, 39, 0.58);
+  font-weight: 700;
+  border-radius: 10px;
 }
 
 .modal-content h2 {
@@ -911,48 +1170,98 @@ const getHomepage = (event) =>
   margin-top: 22px;
 }
 
+@media (max-width: 1100px) {
+  .calendar-summary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .summary-main {
+    grid-column: 1 / -1;
+  }
+
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .day-panel {
+    position: static;
+  }
+}
+
 @media (max-width: 760px) {
-  .calendar-shell {
-    padding: 16px;
+  .calendar-page-head {
+    align-items: stretch;
+    flex-direction: column;
   }
 
-  .calendar-top {
-    gap: 8px;
+  .today-btn {
+    width: fit-content;
   }
 
-  .calendar-top h3 {
-    font-size: 16px;
+  .calendar-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-main {
+    grid-column: auto;
+  }
+
+  .calendar-panel {
+    padding: 13px;
+  }
+
+  .calendar-toolbar {
+    grid-template-columns: auto 1fr auto;
+    gap: 6px;
+  }
+
+  .month-button {
+    padding: 8px 10px;
+  }
+
+  .month-button span {
+    display: none;
+  }
+
+  .month-title h2 {
+    font-size: 17px;
   }
 
   .calendar-grid {
-    gap: 5px;
+    gap: 4px;
   }
 
   .day-name {
-    padding: 8px 2px;
-    font-size: 11px;
+    font-size: 10px;
   }
 
-  .cell {
-    min-height: 90px;
+  .calendar-cell {
+    min-height: 76px;
     padding: 6px;
   }
 
-  .cell b {
-    font-size: 14px;
-  }
-
-  .event {
-    padding: 7px 6px;
+  .day-number {
+    width: 23px;
+    height: 23px;
     font-size: 11px;
-    backdrop-filter: none;
   }
 
-  .festival-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-    background: #ffffff;
-    backdrop-filter: none;
+  .event-count {
+    padding: 2px 5px;
+    font-size: 9px;
+  }
+
+  .event-preview strong {
+    font-size: 10px;
+    -webkit-line-clamp: 2;
+  }
+
+  .event-preview small {
+    display: none;
+  }
+
+  .compact-event-card {
+    grid-template-columns: 70px minmax(0, 1fr) auto;
   }
 
   .modal {
@@ -963,10 +1272,10 @@ const getHomepage = (event) =>
     width: 100%;
   }
 
-.modal-image-wrap {
-  height: 240px;
-  padding: 12px;
-}
+  .modal-image-wrap {
+    height: 240px;
+    padding: 12px;
+  }
 
   .modal-content {
     padding: 22px 18px;
