@@ -3,7 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import Chart from 'chart.js/auto'
 import { useLocalHub } from '../stores/localhub'
 
+const props = defineProps({ language: { type: String, default: 'KO' } })
 const { posts, totals, totalViews, totalLikes } = useLocalHub()
+
+const categoryLabels = {'음식점':'Restaurants','축제/공연/행사':'Festivals & Events','문화시설':'Cultural Facilities','레포츠':'Leisure Sports','숙박':'Accommodation','쇼핑':'Shopping','여행코스':'Travel Courses'}
+const boardCategoryLabels = {'여행질문':'Travel Questions','맛집후기':'Restaurant Reviews','축제정보':'Festival Information','자유게시판':'Free Board'}
+const categoryLabel = (value) => props.language === 'KO' ? value : categoryLabels[value]
+const boardCategoryLabel = (value) => props.language === 'KO' ? value : boardCategoryLabels[value]
 
 const categories = [
   '음식점',
@@ -33,7 +39,7 @@ let categoryChart
 let boardChart
 
 const formatNumber = (value) =>
-  Number(value || 0).toLocaleString('ko-KR')
+  Number(value || 0).toLocaleString(props.language === 'KO' ? 'ko-KR' : 'en-US')
 
 onMounted(() =>
   nextTick(() => {
@@ -43,7 +49,7 @@ onMounted(() =>
         type: 'bar',
 
         data: {
-          labels: categories,
+          labels: categories.map(categoryLabel),
 
           datasets: [
             {
@@ -98,7 +104,7 @@ onMounted(() =>
 
               callbacks: {
                 label: (context) =>
-                  `${Number(context.raw || 0).toLocaleString('ko-KR')}건`
+                  `${Number(context.raw || 0).toLocaleString(props.language === 'KO' ? 'ko-KR' : 'en-US')}${props.language === 'KO' ? '건' : ''}`
               }
             }
           },
@@ -138,7 +144,7 @@ onMounted(() =>
                 },
 
                 callback: (value) =>
-                  Number(value).toLocaleString('ko-KR')
+                  Number(value).toLocaleString(props.language === 'KO' ? 'ko-KR' : 'en-US')
               }
             }
           }
@@ -152,7 +158,7 @@ onMounted(() =>
         type: 'doughnut',
 
         data: {
-          labels: boardCategories,
+          labels: boardCategories.map(boardCategoryLabel),
 
           datasets: [
             {
@@ -222,7 +228,7 @@ onMounted(() =>
 
               callbacks: {
                 label: (context) =>
-                  `${context.label}: ${context.raw}개`
+                  `${context.label}: ${context.raw}${props.language === 'KO' ? '개' : ''}`
               }
             }
           }
@@ -245,40 +251,37 @@ onBeforeUnmount(() => {
         <div>
           <div class="eyebrow">DASHBOARD</div>
 
-          <h1>관광 데이터 · 커뮤니티 대시보드</h1>
+          <h1>{{ props.language === 'KO' ? '관광 데이터 · 커뮤니티 대시보드' : 'Tourism Data & Community Dashboard' }}</h1>
 
-          <p>
-            실제 JSON 건수와 현재 브라우저의 커뮤니티 통계를
-            확인합니다.
-          </p>
+          <p>{{ props.language === 'KO' ? '실제 JSON 건수와 현재 브라우저의 커뮤니티 통계를 확인합니다.' : 'View actual JSON counts and community statistics in this browser.' }}</p>
         </div>
       </div>
 
       <div class="stats-grid">
         <div class="panel stat">
-          <span>전체 관광 데이터</span>
+          <span>{{ props.language === 'KO' ? '전체 관광 데이터' : 'Total Tourism Data' }}</span>
           <strong>{{ formatNumber(totalTourCount) }}</strong>
         </div>
 
         <div class="panel stat">
-          <span>게시글</span>
+          <span>{{ props.language === 'KO' ? '게시글' : 'Posts' }}</span>
           <strong>{{ posts.length }}</strong>
         </div>
 
         <div class="panel stat">
-          <span>누적 조회</span>
+          <span>{{ props.language === 'KO' ? '누적 조회' : 'Total Views' }}</span>
           <strong>{{ totalViews }}</strong>
         </div>
 
         <div class="panel stat">
-          <span>누적 좋아요</span>
+          <span>{{ props.language === 'KO' ? '누적 좋아요' : 'Total Likes' }}</span>
           <strong>{{ totalLikes }}</strong>
         </div>
       </div>
 
       <div class="charts">
         <div class="panel chart">
-          <h3>콘텐츠 유형별 데이터 수</h3>
+          <h3>{{ props.language === 'KO' ? '콘텐츠 유형별 데이터 수' : 'Data Count by Content Type' }}</h3>
 
           <div class="chart-canvas">
             <canvas id="categoryChart"></canvas>
@@ -286,7 +289,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="panel chart">
-          <h3>커뮤니티 카테고리 비율</h3>
+          <h3>{{ props.language === 'KO' ? '커뮤니티 카테고리 비율' : 'Community Category Distribution' }}</h3>
 
           <div class="chart-canvas">
             <canvas id="boardChart"></canvas>
@@ -298,9 +301,9 @@ onBeforeUnmount(() => {
         <table>
           <thead>
             <tr>
-              <th>데이터 유형</th>
-              <th>건수</th>
-              <th>표시 방식</th>
+              <th>{{ props.language === 'KO' ? '데이터 유형' : 'Data Type' }}</th>
+              <th>{{ props.language === 'KO' ? '건수' : 'Count' }}</th>
+              <th>{{ props.language === 'KO' ? '표시 방식' : 'Display' }}</th>
             </tr>
           </thead>
 
@@ -309,7 +312,7 @@ onBeforeUnmount(() => {
               v-for="category in categories"
               :key="category"
             >
-              <td>{{ category }}</td>
+              <td>{{ categoryLabel(category) }}</td>
 
               <td>
                 {{ formatNumber(totals[category]) }}
@@ -318,8 +321,8 @@ onBeforeUnmount(() => {
               <td>
                 {{
                   category === '축제/공연/행사'
-                    ? '지도 · 캘린더'
-                    : '지도 · 목록'
+                    ? (props.language === 'KO' ? '지도 · 캘린더' : 'Map · Calendar')
+                    : (props.language === 'KO' ? '지도 · 목록' : 'Map · List')
                 }}
               </td>
             </tr>

@@ -2,16 +2,23 @@
 import { computed } from 'vue'
 import { useLocalHub } from '../stores/localhub'
 
+const props = defineProps({ language: { type: String, default: 'KO' } })
 const { posts, totals, bookmarkedPosts } = useLocalHub()
 const totalTourCount = computed(() => Object.values(totals).reduce((sum, value) => sum + Number(value || 0), 0))
 
-const menus = [
+const menus = computed(() => props.language === 'KO' ? [
   { to:'/board', icon:'📝', label:'부산 게시판', desc:'부산 이야기를 작성하고 검색하세요.' },
   { to:'/map', icon:'🗺️', label:'지도', desc:'카테고리별 관광 POI를 확인하세요.' },
   { to:'/dashboard', icon:'📊', label:'대시보드', desc:'관광 데이터와 커뮤니티 통계를 확인하세요.' },
   { to:'/calendar', icon:'📅', label:'축제 캘린더', desc:'부산 축제와 공연을 날짜별로 확인하세요.' },
   { to:'/bookmarks', icon:'🔖', label:'북마크', desc:'저장한 게시글을 한곳에서 관리하세요.' },
-]
+] : [
+  { to:'/board', icon:'📝', label:'Busan Board', desc:'Write and search stories about Busan.' },
+  { to:'/map', icon:'🗺️', label:'Map', desc:'Explore tourist POIs by category.' },
+  { to:'/dashboard', icon:'📊', label:'Dashboard', desc:'View tourism and community statistics.' },
+  { to:'/calendar', icon:'📅', label:'Festival Calendar', desc:'Browse Busan festivals and performances by date.' },
+  { to:'/bookmarks', icon:'🔖', label:'Bookmarks', desc:'Manage saved posts in one place.' },
+])
 const formatNumber = (value) => Number(value || 0).toLocaleString('ko-KR')
 </script>
 
@@ -20,12 +27,12 @@ const formatNumber = (value) => Number(value || 0).toLocaleString('ko-KR')
     <div class="container">
       <div class="hero-box">
         <div>
-          <span class="badge">부산 지역 정보 공유 커뮤니티</span>
-          <h1>부산의 오늘을<br>가볍게 발견하세요.</h1>
-          <p>관광지, 축제, 맛집 정보를 확인하고<br>익명으로 나만의 부산 이야기를 공유해보세요.</p>
+          <span class="badge">{{ props.language === 'KO' ? '부산 지역 정보 공유 커뮤니티' : 'Busan Local Information Community' }}</span>
+          <h1 v-if="props.language === 'KO'">부산의 오늘을<br>가볍게 발견하세요.</h1><h1 v-else>Discover Busan<br>with ease today.</h1>
+          <p v-if="props.language === 'KO'">관광지, 축제, 맛집 정보를 확인하고<br>익명으로 나만의 부산 이야기를 공유해보세요.</p><p v-else>Explore attractions, festivals, and restaurants,<br>then share your own Busan story anonymously.</p>
           <div class="hero-actions">
-            <RouterLink class="btn primary" to="/board">커뮤니티 둘러보기</RouterLink>
-            <RouterLink class="btn ghost" to="/map">부산 지도 보기</RouterLink>
+            <RouterLink class="btn primary" to="/board">{{ props.language === 'KO' ? '커뮤니티 둘러보기' : 'Explore Community' }}</RouterLink>
+            <RouterLink class="btn ghost" to="/map">{{ props.language === 'KO' ? '부산 지도 보기' : 'View Busan Map' }}</RouterLink>
           </div>
         </div>
 
@@ -59,8 +66,8 @@ const formatNumber = (value) => Number(value || 0).toLocaleString('ko-KR')
       <div class="page-head">
         <div>
           <div class="eyebrow">LOCALHUB OVERVIEW</div>
-          <h2>LocalHub 주요 기능</h2>
-          <p>각 카드를 누르면 새로고침 없이 해당 화면으로 이동합니다.</p>
+          <h2>{{ props.language === 'KO' ? 'LocalHub 주요 기능' : 'LocalHub Features' }}</h2>
+          <p>{{ props.language === 'KO' ? '각 카드를 누르면 새로고침 없이 해당 화면으로 이동합니다.' : 'Select a card to move without refreshing the page.' }}</p>
         </div>
       </div>
 
@@ -73,10 +80,10 @@ const formatNumber = (value) => Number(value || 0).toLocaleString('ko-KR')
       </div>
 
       <div class="stats-grid">
-        <div class="panel stat-card"><span>관광 데이터</span><strong>{{ formatNumber(totalTourCount) }}건</strong></div>
-        <div class="panel stat-card"><span>커뮤니티 글</span><strong>{{ posts.length }}건</strong></div>
-        <div class="panel stat-card"><span>축제·행사</span><strong>{{ totals['축제/공연/행사'] }}건</strong></div>
-        <div class="panel stat-card"><span>내 북마크</span><strong>{{ bookmarkedPosts.length }}건</strong></div>
+        <div class="panel stat-card"><span>{{ props.language === 'KO' ? '관광 데이터' : 'Tourism Data' }}</span><strong>{{ formatNumber(totalTourCount) }}{{ props.language === 'KO' ? '건' : '' }}</strong></div>
+        <div class="panel stat-card"><span>{{ props.language === 'KO' ? '커뮤니티 글' : 'Community Posts' }}</span><strong>{{ posts.length }}{{ props.language === 'KO' ? '건' : '' }}</strong></div>
+        <div class="panel stat-card"><span>{{ props.language === 'KO' ? '축제·행사' : 'Festivals & Events' }}</span><strong>{{ totals['축제/공연/행사'] }}{{ props.language === 'KO' ? '건' : '' }}</strong></div>
+        <div class="panel stat-card"><span>{{ props.language === 'KO' ? '내 북마크' : 'My Bookmarks' }}</span><strong>{{ bookmarkedPosts.length }}{{ props.language === 'KO' ? '건' : '' }}</strong></div>
       </div>
     </div>
   </section>

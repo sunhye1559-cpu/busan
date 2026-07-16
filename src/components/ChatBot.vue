@@ -1,7 +1,8 @@
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useLocalHub } from '../stores/localhub'
 
+const props = defineProps({ language: { type: String, default: 'KO' } })
 const { tourData, posts } = useLocalHub()
 
 const botImage =
@@ -18,16 +19,21 @@ const messages = ref([
   {
     role: 'assistant',
     content:
-      '안녕하세요! 부산 관광지, 축제, 숙박, 문화시설, 여행코스를 질문해주세요.',
+      props.language === 'KO' ? '안녕하세요! 부산 관광지, 축제, 숙박, 문화시설, 여행코스를 질문해주세요.' : 'Hello! Ask me about Busan attractions, festivals, accommodation, cultural facilities, and travel courses.',
   },
 ])
 
-const suggestions = [
+const suggestions = computed(() => props.language === 'KO' ? [
   '8월 부산 축제 알려줘',
   '해운대 근처 숙박 추천',
   '아이와 갈 문화시설',
   '부산 여행코스 추천',
-]
+] : [
+  'Busan festivals in August',
+  'Accommodation near Haeundae',
+  'Cultural places for children',
+  'Recommend a Busan travel course',
+])
 
 onMounted(() => {
   const saved = localStorage.getItem('localhub-chat')
@@ -65,11 +71,11 @@ function toggle() {
 }
 
 function clear() {
-  if (confirm('대화를 초기화하시겠습니까?')) {
+  if (confirm(props.language === 'KO' ? '대화를 초기화하시겠습니까?' : 'Clear the conversation?')) {
     messages.value = [
       {
         role: 'assistant',
-        content: '대화가 초기화되었습니다.',
+        content: props.language === 'KO' ? '대화가 초기화되었습니다.' : 'The conversation has been cleared.',
       },
     ]
 
@@ -130,17 +136,17 @@ function context(question) {
 
 function demoAnswer(question, items) {
   if (!items.length) {
-    return '관련 정보를 찾지 못했습니다.'
+    return props.language === 'KO' ? '관련 정보를 찾지 못했습니다.' : 'No relevant information was found.'
   }
 
   return [
-    '첨부된 부산 관광 데이터에서 관련 정보를 찾았습니다.',
+    props.language === 'KO' ? '첨부된 부산 관광 데이터에서 관련 정보를 찾았습니다.' : 'I found relevant information in the Busan tourism data.',
     ...items
       .slice(0, 5)
       .map(
         (item, index) =>
           `${index + 1}. ${item.title} — ${
-            item.address || item.place || '정보 없음'
+            item.address || item.place || (props.language === 'KO' ? '정보 없음' : 'No information')
           }`,
       ),
   ].join('\n')
@@ -176,16 +182,17 @@ async function send() {
         question,
         items,
         posts: posts.slice(-5),
+        language: props.language === 'KO' ? 'ko' : 'en',
       }),
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.error || 'API 요청에 실패했습니다.')
+      throw new Error(data.error || (props.language === 'KO' ? 'API 요청에 실패했습니다.' : 'The API request failed.'))
     }
 
-    const answer = data.answer || '답변을 생성하지 못했습니다.'
+    const answer = data.answer || (props.language === 'KO' ? '답변을 생성하지 못했습니다.' : 'Unable to generate an answer.')
 
     messages.value.push({
       role: 'assistant',
@@ -194,7 +201,7 @@ async function send() {
   } catch (error) {
     messages.value.push({
       role: 'assistant',
-      content: `API 오류: ${error.message}\n\n${demoAnswer(
+      content: `${props.language === 'KO' ? 'API 오류' : 'API error'}: ${error.message}\n\n${demoAnswer(
         question,
         items,
       )}`,
@@ -209,7 +216,7 @@ async function send() {
 
 <template>
   <button class="launcher" @click="toggle">
-    <img :src="botImage" alt="챗봇" />
+    <img :src="botImage" :alt="props.language === 'KO' ? '챗봇' : 'Chatbot'" />
   </button>
 
   <section v-if="open" class="chat">
@@ -218,9 +225,9 @@ async function send() {
         <img :src="botImage" alt="" />
 
         <div>
-          <strong>LocalHub 부산 챗봇</strong>
+          <strong>{{ props.language === 'KO' ? 'LocalHub 부산 챗봇' : 'LocalHub Busan Chatbot' }}</strong>
           <span>
-            {{ hasApiKey ? 'OpenAI API 연결됨' : 'JSON 데모 응답 모드' }}
+            {{ hasApiKey ? (props.language === 'KO' ? 'OpenAI API 연결됨' : 'OpenAI API connected') : (props.language === 'KO' ? 'JSON 데모 응답 모드' : 'JSON demo response mode') }}
           </span>
         </div>
       </div>
@@ -245,7 +252,7 @@ async function send() {
 
       <div v-if="loading" class="row assistant">
         <div class="bubble">
-          답변을 작성하고 있습니다...
+          {{ props.language === 'KO' ? '답변을 작성하고 있습니다...' : 'Writing a response...' }}
         </div>
       </div>
     </div>
@@ -263,12 +270,12 @@ async function send() {
     <form @submit.prevent="send">
       <textarea
         v-model="input"
-        placeholder="부산 정보를 질문하세요"
+        :placeholder="props.language === 'KO' ? '부산 정보를 질문하세요' : 'Ask about Busan'"
         @keydown.enter.exact.prevent="send"
       />
 
       <button :disabled="loading || !input.trim()">
-        전송
+        {{ props.language === 'KO' ? '전송' : 'Send' }}
       </button>
     </form>
   </section>

@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLocalHub } from '../stores/localhub'
 
+const props = defineProps({ language: { type: String, default: 'KO' } })
 const route = useRoute()
 const router = useRouter()
 const { posts, addPost, updatePost, removePost, incrementView, likePost, toggleBookmark } = useLocalHub()
@@ -38,7 +39,7 @@ function openWrite(){
   if(route.query.write) router.replace('/board')
 }
 function save(){
-  if(!form.title || !form.content || !form.password) return alert('제목, 내용, 비밀번호를 입력해주세요.')
+  if(!form.title || !form.content || !form.password) return alert(props.language === 'KO' ? '제목, 내용, 비밀번호를 입력해주세요.' : 'Please enter a title, content, and password.')
   if(editingId.value) updatePost(editingId.value,{ category:form.category,title:form.title,author:form.author||'익명',content:form.content })
   else addPost(form)
   writeOpen.value = false
@@ -46,46 +47,46 @@ function save(){
 }
 function openPost(post){ incrementView(post); selectedPost.value = post }
 function edit(post){
-  const password = prompt('수정 비밀번호를 입력하세요.')
-  if(password !== post.password) return alert('비밀번호가 일치하지 않습니다.')
+  const password = prompt(props.language === 'KO' ? '수정 비밀번호를 입력하세요.' : 'Enter the edit password.')
+  if(password !== post.password) return alert(props.language === 'KO' ? '비밀번호가 일치하지 않습니다.' : 'The password does not match.')
   editingId.value = post.id
   Object.assign(form,{ category:post.category,title:post.title,author:post.author,content:post.content,password:post.password })
   selectedPost.value = null
   writeOpen.value = true
 }
 function remove(post){
-  const password = prompt('삭제 비밀번호를 입력하세요.')
-  if(password !== post.password) return alert('비밀번호가 일치하지 않습니다.')
-  if(confirm('삭제하시겠습니까?')){ removePost(post.id); selectedPost.value = null }
+  const password = prompt(props.language === 'KO' ? '삭제 비밀번호를 입력하세요.' : 'Enter the delete password.')
+  if(password !== post.password) return alert(props.language === 'KO' ? '비밀번호가 일치하지 않습니다.' : 'The password does not match.')
+  if(confirm(props.language === 'KO' ? '삭제하시겠습니까?' : 'Delete this post?')){ removePost(post.id); selectedPost.value = null }
 }
-const formatDate = (value) => value ? new Date(value).toLocaleDateString('ko-KR') : ''
+const formatDate = (value) => value ? new Date(value).toLocaleDateString(props.language === 'KO' ? 'ko-KR' : 'en-US') : ''
 </script>
 
 <template>
 <section class="page"><div class="container">
-  <div class="page-head"><div><div class="eyebrow">COMMUNITY</div><h1>부산 게시판</h1><p>게시글 작성·상세·수정·삭제와 북마크가 동작합니다.</p></div><button class="btn primary" @click="openWrite">+ 새 글 작성</button></div>
+  <div class="page-head"><div><div class="eyebrow">COMMUNITY</div><h1>{{ props.language === 'KO' ? '부산 게시판' : 'Busan Board' }}</h1><p>{{ props.language === 'KO' ? '게시글 작성·상세·수정·삭제와 북마크가 동작합니다.' : 'Create, view, edit, delete, and bookmark posts.' }}</p></div><button class="btn primary" @click="openWrite">+ {{ props.language === 'KO' ? '새 글 작성' : 'New Post' }}</button></div>
   <div class="panel">
-    <div class="toolbar"><input class="input grow" v-model="query" placeholder="제목, 내용, 작성자를 검색하세요"><select class="input" v-model="category"><option>전체</option><option v-for="item in categories">{{ item }}</option></select></div>
-    <div class="board-head"><div>번호</div><div>분류</div><div>제목</div><div>작성자</div><div>조회</div><div>좋아요</div></div>
+    <div class="toolbar"><input class="input grow" v-model="query" :placeholder="props.language === 'KO' ? '제목, 내용, 작성자를 검색하세요' : 'Search title, content, or author'"><select class="input" v-model="category"><option value="전체">{{ props.language === 'KO' ? '전체' : 'All' }}</option><option v-for="item in categories">{{ item }}</option></select></div>
+    <div class="board-head"><div>{{ props.language === 'KO' ? '번호' : 'No.' }}</div><div>{{ props.language === 'KO' ? '분류' : 'Category' }}</div><div>{{ props.language === 'KO' ? '제목' : 'Title' }}</div><div>{{ props.language === 'KO' ? '작성자' : 'Author' }}</div><div>{{ props.language === 'KO' ? '조회' : 'Views' }}</div><div>{{ props.language === 'KO' ? '좋아요' : 'Likes' }}</div></div>
     <div class="post-row" v-for="(post,index) in filteredPosts" :key="post.id">
       <div class="meta">{{ filteredPosts.length-index }}</div><div class="post-category">{{ post.category }}</div>
       <div><div class="post-title" @click="openPost(post)">{{ post.title }}</div><div class="meta">{{ formatDate(post.createdAt) }}</div></div>
       <div class="meta">{{ post.author }}</div><div class="meta">{{ post.views||0 }}</div><div class="meta">♥ {{ post.likes||0 }}</div>
     </div>
-    <div class="empty" v-if="!filteredPosts.length">검색 결과가 없습니다.</div>
+    <div class="empty" v-if="!filteredPosts.length">{{ props.language === 'KO' ? '검색 결과가 없습니다.' : 'No results found.' }}</div>
   </div>
 </div></section>
 
 <div class="modal" v-if="writeOpen" @click.self="writeOpen=false">
-  <div class="modal-card"><h2>{{ editingId ? '게시글 수정' : '새 게시글 작성' }}</h2>
-    <div class="form-grid"><select class="input" v-model="form.category"><option v-for="item in categories">{{ item }}</option></select><input class="input" v-model.trim="form.title" placeholder="제목"><input class="input" v-model.trim="form.author" placeholder="작성자"><textarea class="input" v-model.trim="form.content" placeholder="내용"></textarea><input class="input" type="password" v-model="form.password" placeholder="수정·삭제 비밀번호"></div>
-    <div class="modal-actions"><button class="btn ghost" @click="writeOpen=false">취소</button><button class="btn primary" @click="save">저장</button></div>
+  <div class="modal-card"><h2>{{ editingId ? (props.language === 'KO' ? '게시글 수정' : 'Edit Post') : (props.language === 'KO' ? '새 게시글 작성' : 'New Post') }}</h2>
+    <div class="form-grid"><select class="input" v-model="form.category"><option v-for="item in categories">{{ item }}</option></select><input class="input" v-model.trim="form.title" :placeholder="props.language === 'KO' ? '제목' : 'Title'"><input class="input" v-model.trim="form.author" :placeholder="props.language === 'KO' ? '작성자' : 'Author'"><textarea class="input" v-model.trim="form.content" :placeholder="props.language === 'KO' ? '내용' : 'Content'"></textarea><input class="input" type="password" v-model="form.password" :placeholder="props.language === 'KO' ? '수정·삭제 비밀번호' : 'Edit/Delete password'"></div>
+    <div class="modal-actions"><button class="btn ghost" @click="writeOpen=false">{{ props.language === 'KO' ? '취소' : 'Cancel' }}</button><button class="btn primary" @click="save">{{ props.language === 'KO' ? '저장' : 'Save' }}</button></div>
   </div>
 </div>
 
 <div class="modal" v-if="selectedPost" @click.self="selectedPost=null">
-  <div class="modal-card"><span class="post-category">{{ selectedPost.category }}</span><h2>{{ selectedPost.title }}</h2><div class="meta">{{ selectedPost.author }} · {{ formatDate(selectedPost.createdAt) }} · 조회 {{ selectedPost.views }}</div><div class="detail-body">{{ selectedPost.content }}</div>
-    <div class="modal-actions between"><div><button class="btn ghost small" @click="likePost(selectedPost)">♥ 좋아요 {{ selectedPost.likes }}</button><button class="btn ghost small" @click="toggleBookmark(selectedPost)">{{ selectedPost.bookmarked?'★ 북마크 해제':'☆ 북마크' }}</button></div><div><button class="btn ghost small" @click="edit(selectedPost)">수정</button><button class="btn danger small" @click="remove(selectedPost)">삭제</button></div></div>
+  <div class="modal-card"><span class="post-category">{{ selectedPost.category }}</span><h2>{{ selectedPost.title }}</h2><div class="meta">{{ selectedPost.author }} · {{ formatDate(selectedPost.createdAt) }} · {{ props.language === 'KO' ? '조회' : 'Views' }} {{ selectedPost.views }}</div><div class="detail-body">{{ selectedPost.content }}</div>
+    <div class="modal-actions between"><div><button class="btn ghost small" @click="likePost(selectedPost)">♥ {{ props.language === 'KO' ? '좋아요' : 'Like' }} {{ selectedPost.likes }}</button><button class="btn ghost small" @click="toggleBookmark(selectedPost)">{{ selectedPost.bookmarked ? (props.language === 'KO' ? '★ 북마크 해제' : '★ Remove Bookmark') : (props.language === 'KO' ? '☆ 북마크' : '☆ Bookmark') }}</button></div><div><button class="btn ghost small" @click="edit(selectedPost)">{{ props.language === 'KO' ? '수정' : 'Edit' }}</button><button class="btn danger small" @click="remove(selectedPost)">{{ props.language === 'KO' ? '삭제' : 'Delete' }}</button></div></div>
   </div>
 </div>
 </template>

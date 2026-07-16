@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useLocalHub } from '../stores/localhub'
 
+const props = defineProps({ language: { type: String, default: 'KO' } })
 const { tourData } = useLocalHub()
 const year = ref(2026)
 const month = ref(7)
@@ -23,13 +24,13 @@ const cells = computed(() => {
   return result
 })
 function move(amount){ month.value += amount;if(month.value<0){month.value=11;year.value--}if(month.value>11){month.value=0;year.value++} }
-const formatDate=(value)=>value?.length===8?`${value.slice(0,4)}.${value.slice(4,6)}.${value.slice(6,8)}`:'미정'
+const formatDate=(value)=>value?.length===8?`${value.slice(0,4)}.${value.slice(4,6)}.${value.slice(6,8)}`:(props.language === 'KO' ? '미정' : 'TBD')
 </script>
 
 <template>
 <section class="page"><div class="container">
-  <div class="page-head"><div><div class="eyebrow">FESTIVAL CALENDAR</div><h1>축제 캘린더</h1><p>행사 날짜, 장소, 갱신일 정보를 확인합니다.</p></div></div>
-  <div class="panel calendar-shell"><div class="calendar-top"><button class="btn ghost small" @click="move(-1)">‹ 이전</button><h3>{{ year }}년 {{ month+1 }}월</h3><button class="btn ghost small" @click="move(1)">다음 ›</button></div>
+  <div class="page-head"><div><div class="eyebrow">FESTIVAL CALENDAR</div><h1>{{ props.language === 'KO' ? '축제 캘린더' : 'Festival Calendar' }}</h1><p>{{ props.language === 'KO' ? '행사 날짜, 장소, 갱신일 정보를 확인합니다.' : 'Check event dates, locations, and update information.' }}</p></div></div>
+  <div class="panel calendar-shell"><div class="calendar-top"><button class="btn ghost small" @click="move(-1)">‹ {{ props.language === 'KO' ? '이전' : 'Previous' }}</button><h3>{{ props.language === 'KO' ? `${year}년 ${month+1}월` : `${month+1}/${year}` }}</h3><button class="btn ghost small" @click="move(1)">{{ props.language === 'KO' ? '다음' : 'Next' }} ›</button></div>
     <div class="wave-bg" aria-hidden>
       <svg class="wave wave1" viewBox="0 0 1200 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -44,11 +45,11 @@ const formatDate=(value)=>value?.length===8?`${value.slice(0,4)}.${value.slice(4
         <path d="M0,120 C200,20 400,220 600,120 C800,20 1000,220 1200,120 L1200,200 L0,200 Z" fill="rgba(59,176,255,0.12)" />
       </svg>
     </div>
-    <div class="calendar-grid"><div class="day-name" v-for="day in ['일','월','화','수','목','금','토']">{{ day }}</div><div class="cell" :class="{muted:!cell.current}" v-for="cell in cells"><b>{{ cell.day }}</b><button class="event" v-for="event in cell.events.slice(0,3)" @click="selected=event">{{ event.title }}</button></div></div>
+    <div class="calendar-grid"><div class="day-name" v-for="day in (props.language === 'KO' ? ['일','월','화','수','목','금','토'] : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'])">{{ day }}</div><div class="cell" :class="{muted:!cell.current}" v-for="cell in cells"><b>{{ cell.day }}</b><button class="event" v-for="event in cell.events.slice(0,3)" @click="selected=event">{{ event.title }}</button></div></div>
   </div>
-  <div class="panel festival-list"><div class="festival-row" v-for="event in festivals.slice(0,30)" @click="selected=event"><span class="badge">{{ formatDate(event.start) }}</span><div><strong>{{ event.title }}</strong><div class="meta">{{ event.address }}</div></div><div class="meta">{{ event.place||'장소 정보 없음' }}</div><div class="meta">갱신 {{ formatDate(event.modified?.slice(0,8)) }}</div></div></div>
+  <div class="panel festival-list"><div class="festival-row" v-for="event in festivals.slice(0,30)" @click="selected=event"><span class="badge">{{ formatDate(event.start) }}</span><div><strong>{{ event.title }}</strong><div class="meta">{{ event.address }}</div></div><div class="meta">{{ event.place || (props.language === 'KO' ? '장소 정보 없음' : 'No venue information') }}</div><div class="meta">{{ props.language === 'KO' ? '갱신' : 'Updated' }} {{ formatDate(event.modified?.slice(0,8)) }}</div></div></div>
 </div></section>
-<div class="modal" v-if="selected" @click.self="selected=null"><div class="modal-card"><span class="badge">{{ formatDate(selected.start) }} ~ {{ formatDate(selected.end) }}</span><h2>{{ selected.title }}</h2><p><b>장소</b> {{ selected.place||selected.address||'정보 없음' }}</p><p><b>시간</b> {{ selected.playtime||'정보 없음' }}</p><p><b>주소</b> {{ selected.address||'정보 없음' }}</p><button class="btn primary" @click="selected=null">확인</button></div></div>
+<div class="modal" v-if="selected" @click.self="selected=null"><div class="modal-card"><span class="badge">{{ formatDate(selected.start) }} ~ {{ formatDate(selected.end) }}</span><h2>{{ selected.title }}</h2><p><b>{{ props.language === 'KO' ? '장소' : 'Venue' }}</b> {{ selected.place||selected.address||(props.language === 'KO' ? '정보 없음' : 'No information') }}</p><p><b>{{ props.language === 'KO' ? '시간' : 'Time' }}</b> {{ selected.playtime||(props.language === 'KO' ? '정보 없음' : 'No information') }}</p><p><b>{{ props.language === 'KO' ? '주소' : 'Address' }}</b> {{ selected.address||(props.language === 'KO' ? '정보 없음' : 'No information') }}</p><button class="btn primary" @click="selected=null">{{ props.language === 'KO' ? '확인' : 'Close' }}</button></div></div>
 </template>
 
 <style scoped>
